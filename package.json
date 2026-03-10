@@ -1,0 +1,6 @@
+{
+  "name": "aihub",
+  "version": "1.0.0",
+  "description": "AI Hub - ChatGPT, Gemini, Claude, NotebookLM in one window",
+  "main": "main.js"
+}

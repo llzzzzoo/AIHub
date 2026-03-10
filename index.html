@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>AIHub</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #1e1e1e; }
+    body { display: flex; flex-direction: column; }
+
+    #tab-bar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      height: 44px;
+      background: #2b2b2b;
+      user-select: none;
+      -webkit-app-region: drag;
+      padding: 0 140px;
+      gap: 2px;
+      position: relative;
+    }
+
+    .tab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 18px;
+      color: #999;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      -webkit-app-region: no-drag;
+      border-radius: 8px 8px 0 0;
+      height: 38px;
+      min-width: 100px;
+      max-width: 200px;
+      position: relative;
+      background: transparent;
+    }
+
+    .tab:hover { background: #383838; color: #ccc; }
+    .tab.active { background: #1e1e1e; color: #e8e8e8; }
+    .tab.drag-over { box-shadow: inset 2px 0 0 #888; }
+
+    .tab-icon { width: 20px; height: 20px; border-radius: 3px; flex-shrink: 0; }
+
+    .tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .tab-close {
+      display: flex; align-items: center; justify-content: center;
+      width: 18px; height: 18px; border-radius: 4px; border: none;
+      background: transparent; color: #666; font-size: 14px;
+      cursor: pointer; flex-shrink: 0; margin-left: auto; line-height: 1; padding: 0;
+    }
+    .tab-close:hover { background: #555; color: #e8e8e8; }
+
+    #add-tab-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; border-radius: 6px; border: none;
+      background: transparent; color: #999; font-size: 18px;
+      cursor: pointer; flex-shrink: 0; margin-left: 4px; margin-bottom: 5px;
+      -webkit-app-region: no-drag; position: relative;
+    }
+    #add-tab-btn:hover { background: #383838; color: #e8e8e8; }
+
+    #add-dropdown {
+      display: none; position: absolute; top: 44px;
+      background: #2f2f2f; border: 1px solid #444; border-radius: 8px;
+      padding: 4px 0; min-width: 200px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 1001;
+    }
+    #add-dropdown.show { display: block; }
+
+    #dropdown-overlay {
+      display: none; position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%; z-index: 1000;
+    }
+    #dropdown-overlay.show { display: block; }
+
+    .dropdown-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 14px; color: #ccc; font-size: 13px;
+      cursor: pointer; transition: background 0.1s;
+    }
+    .dropdown-item:hover { background: #444; color: #fff; }
+    .dropdown-item img { width: 18px; height: 18px; border-radius: 3px; flex-shrink: 0; }
+
+    #ctx-overlay {
+      display: none; position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%; z-index: 1999;
+    }
+    #ctx-overlay.show { display: block; }
+
+    #context-menu {
+      display: none; position: fixed; background: #2a2a2a;
+      border: 1px solid #3a3a3a; border-radius: 8px;
+      padding: 4px 0; min-width: 180px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5); z-index: 2000;
+    }
+    #context-menu.show { display: block; }
+
+    .ctx-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 7px 14px; color: #bbb; font-size: 12.5px;
+      cursor: pointer; transition: background 0.1s;
+    }
+    .ctx-item:hover { background: #3a3a3a; color: #e8e8e8; }
+    .ctx-item .shortcut { color: #666; font-size: 11px; margin-left: 24px; }
+    .ctx-sep { height: 1px; background: #3a3a3a; margin: 4px 8px; }
+
+    /* Usage bar */
+    #usage-bar {
+      position: absolute;
+      right: 146px;
+      top: 0;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      -webkit-app-region: no-drag;
+    }
+
+    .usage-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: default;
+      position: relative;
+    }
+
+    .usage-label { font-size: 10px; color: #777; font-weight: 500; }
+
+    .battery {
+      width: 28px; height: 13px;
+      border: 1.5px solid #666; border-radius: 2px;
+      position: relative; display: flex;
+      align-items: center; padding: 1.5px;
+    }
+    .battery::after {
+      content: ''; position: absolute; right: -4px; top: 3px;
+      width: 2px; height: 5px; background: #666; border-radius: 0 1px 1px 0;
+    }
+    .battery-fill { height: 100%; border-radius: 1px; transition: width 0.3s, background 0.3s; }
+
+    .usage-tooltip {
+      display: none; position: absolute; bottom: -32px; left: 50%;
+      transform: translateX(-50%); background: #1e1e1e;
+      border: 1px solid #444; border-radius: 4px;
+      padding: 4px 8px; font-size: 10px; color: #ccc;
+      white-space: nowrap; z-index: 100;
+    }
+    .usage-item:hover .usage-tooltip { display: block; }
+
+    #mem-display { font-size: 10px; color: #666; }
+
+    #refresh-usage-btn {
+      background: none; border: none; color: #666; font-size: 13px;
+      cursor: pointer; padding: 2px 4px; border-radius: 3px;
+      display: flex; align-items: center;
+    }
+    #refresh-usage-btn:hover { color: #ccc; background: #383838; }
+    #refresh-usage-btn.spinning { animation: spin 0.8s linear infinite; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    #webview-container { flex: 1; position: relative; background: #1e1e1e; }
+
+    webview {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none;
+    }
+    webview.active { display: flex; }
+
+    /* Hidden webviews for usage scraping */
+    .usage-wv {
+      position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="tab-bar">
+    <div class="tab active" data-index="0" draggable="true">
+      <img class="tab-icon" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 41 41' fill='none'%3E%3Cpath d='M37.532 16.87a9.963 9.963 0 0 0-.856-8.184 10.078 10.078 0 0 0-10.855-4.835A9.964 9.964 0 0 0 18.306.5a10.079 10.079 0 0 0-9.614 6.977 9.967 9.967 0 0 0-6.664 4.834 10.08 10.08 0 0 0 1.24 11.817 9.965 9.965 0 0 0 .856 8.185 10.079 10.079 0 0 0 10.855 4.835 9.965 9.965 0 0 0 7.516 3.35 10.078 10.078 0 0 0 9.617-6.981 9.967 9.967 0 0 0 6.663-4.834 10.079 10.079 0 0 0-1.243-11.813ZM22.498 37.886a7.474 7.474 0 0 1-4.799-1.735c.061-.033.168-.091.237-.134l7.964-4.6a1.294 1.294 0 0 0 .655-1.134V19.054l3.366 1.944a.12.12 0 0 1 .066.092v9.299a7.505 7.505 0 0 1-7.49 7.496ZM6.392 31.006a7.471 7.471 0 0 1-.894-5.023c.06.036.162.099.237.141l7.964 4.6a1.297 1.297 0 0 0 1.308 0l9.724-5.614v3.888a.12.12 0 0 1-.048.103l-8.051 4.649a7.504 7.504 0 0 1-10.24-2.744ZM4.297 13.62A7.469 7.469 0 0 1 8.2 10.333c0 .068-.004.19-.004.274v9.201a1.294 1.294 0 0 0 .654 1.132l9.723 5.614-3.366 1.944a.12.12 0 0 1-.114.012L7.044 23.86a7.504 7.504 0 0 1-2.747-10.24Zm27.658 6.437-9.724-5.615 3.367-1.943a.121.121 0 0 1 .113-.012l8.051 4.649a7.498 7.498 0 0 1-1.158 13.528v-9.476a1.293 1.293 0 0 0-.649-1.131Zm3.35-5.043c-.059-.037-.162-.099-.236-.141l-7.965-4.6a1.298 1.298 0 0 0-1.308 0l-9.723 5.614v-3.888a.12.12 0 0 1 .048-.103l8.05-4.645a7.497 7.497 0 0 1 11.135 7.763Zm-21.063 6.929-3.367-1.944a.12.12 0 0 1-.065-.092v-9.299a7.497 7.497 0 0 1 12.293-5.756 6.94 6.94 0 0 0-.236.134l-7.965 4.6a1.294 1.294 0 0 0-.654 1.132l-.006 11.225Zm1.829-3.943 4.33-2.501 4.332 2.5v5l-4.331 2.5-4.331-2.5V18Z' fill='white'/%3E%3C/svg%3E">
+      <span class="tab-label">ChatGPT</span>
+      <button class="tab-close" title="Close">&times;</button>
+    </div>
+    <div class="tab" data-index="1" draggable="true">
+      <img class="tab-icon" src="https://www.google.com/s2/favicons?domain=gemini.google.com&sz=32">
+      <span class="tab-label">Gemini</span>
+      <button class="tab-close" title="Close">&times;</button>
+    </div>
+    <div class="tab" data-index="2" draggable="true">
+      <img class="tab-icon" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='2 2.5 12 9.5'%3E%3Cpath fill='white' d='M 8 3.5 C 5.23833 3.5 3 5.72 3 8.45917 V 10.8333 H 3.92167 V 10.5967 C 3.92167 9.48583 4.82917 8.585 5.94917 8.585 C 7.06917 8.585 7.97667 9.48583 7.97667 10.5967 V 10.8333 H 8.89833 V 10.5967 C 8.89833 8.98083 7.5775 7.67167 5.94917 7.67167 C 5.315 7.67167 4.7275 7.87 4.24667 8.20833 C 4.75 7.21583 5.78667 6.535 6.98333 6.535 C 8.67417 6.535 10.045 7.895 10.045 9.57167 V 10.8333 H 10.9667 V 9.57167 C 10.9667 7.39 9.18333 5.62083 6.98333 5.62083 C 5.99417 5.62083 5.08917 5.97833 4.3925 6.57083 C 5.07667 5.28833 6.435 4.41417 8 4.41417 C 10.2525 4.41417 12.0783 6.225 12.0783 8.45917 V 10.8333 H 13 V 8.45917 C 13 5.72 10.7617 3.5 8 3.5 Z'/%3E%3C/svg%3E">
+      <span class="tab-label">NotebookLM</span>
+      <button class="tab-close" title="Close">&times;</button>
+    </div>
+    <button id="add-tab-btn" title="New tab">+</button>
+    <div id="add-dropdown"></div>
+
+    <!-- Usage bar -->
+    <div id="usage-bar">
+      <span id="mem-display">--</span>
+      <div class="usage-item">
+        <span class="usage-label">Claude</span>
+        <div class="battery"><div class="battery-fill" id="claude-fill"></div></div>
+        <div class="usage-tooltip" id="claude-tip">waiting...</div>
+      </div>
+      <div class="usage-item">
+        <span class="usage-label">Codex</span>
+        <div class="battery"><div class="battery-fill" id="codex-fill"></div></div>
+        <div class="usage-tooltip" id="codex-tip">waiting...</div>
+      </div>
+      <button id="refresh-usage-btn" title="Refresh usage">&#x21bb;</button>
+    </div>
+  </div>
+
+  <div id="dropdown-overlay"></div>
+  <div id="ctx-overlay"></div>
+  <div id="context-menu">
+    <div class="ctx-item" data-action="copy"><span>Copy</span><span class="shortcut">Ctrl+C</span></div>
+    <div class="ctx-item" data-action="paste"><span>Paste</span><span class="shortcut">Ctrl+V</span></div>
+    <div class="ctx-item" data-action="cut"><span>Cut</span><span class="shortcut">Ctrl+X</span></div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" data-action="selectAll"><span>Select All</span><span class="shortcut">Ctrl+A</span></div>
+    <div class="ctx-sep"></div>
+    <div class="ctx-item" data-action="reload"><span>Reload</span><span class="shortcut">Ctrl+R</span></div>
+    <div class="ctx-item" data-action="copyUrl"><span>Copy URL</span><span class="shortcut"></span></div>
+  </div>
+
+  <div id="webview-container">
+    <webview class="active" src="https://chatgpt.com" partition="persist:chatgpt"></webview>
+    <webview data-src="https://gemini.google.com/?hl=zh" partition="persist:gemini"></webview>
+    <webview data-src="https://notebooklm.google.com" partition="persist:notebooklm"></webview>
+    <!-- Hidden usage scraping webviews -->
+    <webview class="usage-wv" id="claude-usage-wv" src="https://claude.ai/settings/usage" partition="persist:claude"></webview>
+    <webview class="usage-wv" id="codex-usage-wv" src="https://chatgpt.com/codex/settings/usage" partition="persist:codex"></webview>
+  </div>
+
+  <script>
+    const tabBar = document.getElementById('tab-bar');
+    const webviewContainer = document.getElementById('webview-container');
+    let dragSrcEl = null;
+
+    function switchTo(index) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('webview:not(.usage-wv)').forEach(w => w.classList.remove('active'));
+      document.querySelectorAll('.tab')[index].classList.add('active');
+      const wv = document.querySelectorAll('webview:not(.usage-wv)')[index];
+      wv.classList.add('active');
+      if (!wv.src && wv.dataset.src) {
+        wv.src = wv.dataset.src;
+      }
+    }
+
+    function getActiveIndex() {
+      const tabs = document.querySelectorAll('.tab');
+      for (let i = 0; i < tabs.length; i++) {
+        if (tabs[i].classList.contains('active')) return i;
+      }
+      return 0;
+    }
+
+    tabBar.addEventListener('click', (e) => {
+      if (e.target.closest('.tab-close')) {
+        const tab = e.target.closest('.tab');
+        const tabs = [...document.querySelectorAll('.tab')];
+        const index = tabs.indexOf(tab);
+        const webviews = [...document.querySelectorAll('webview:not(.usage-wv)')];
+        const wasActive = tab.classList.contains('active');
+        tab.remove();
+        webviews[index].remove();
+        if (wasActive) {
+          const remaining = document.querySelectorAll('.tab');
+          if (remaining.length > 0) {
+            const newIndex = Math.min(index, remaining.length - 1);
+            switchTo(newIndex);
+          }
+        }
+        return;
+      }
+      const tab = e.target.closest('.tab');
+      if (!tab) return;
+      const index = [...document.querySelectorAll('.tab')].indexOf(tab);
+      switchTo(index);
+    });
+
+    const { ipcRenderer } = require('electron');
+    ipcRenderer.on('switch-tab', (_, isShift) => {
+      const total = document.querySelectorAll('.tab').length;
+      const cur = getActiveIndex();
+      const next = isShift ? (cur - 1 + total) % total : (cur + 1) % total;
+      switchTo(next);
+    });
+
+    tabBar.addEventListener('dragstart', (e) => {
+      dragSrcEl = e.target.closest('.tab');
+      if (!dragSrcEl) return;
+      e.dataTransfer.effectAllowed = 'move';
+      dragSrcEl.style.opacity = '0.4';
+    });
+
+    tabBar.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const target = e.target.closest('.tab');
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('drag-over'));
+      if (target && target !== dragSrcEl) target.classList.add('drag-over');
+    });
+
+    tabBar.addEventListener('dragleave', (e) => {
+      const target = e.target.closest('.tab');
+      if (target) target.classList.remove('drag-over');
+    });
+
+    tabBar.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const target = e.target.closest('.tab');
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('drag-over'));
+      if (!target || target === dragSrcEl) return;
+      const tabs = [...document.querySelectorAll('.tab')];
+      const webviews = [...document.querySelectorAll('webview:not(.usage-wv)')];
+      const srcIdx = tabs.indexOf(dragSrcEl);
+      const dstIdx = tabs.indexOf(target);
+      if (srcIdx < dstIdx) {
+        tabBar.insertBefore(dragSrcEl, target.nextSibling);
+        webviewContainer.insertBefore(webviews[srcIdx], webviews[dstIdx].nextSibling);
+      } else {
+        tabBar.insertBefore(dragSrcEl, target);
+        webviewContainer.insertBefore(webviews[srcIdx], webviews[dstIdx]);
+      }
+    });
+
+    tabBar.addEventListener('dragend', () => {
+      if (dragSrcEl) dragSrcEl.style.opacity = '1';
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('drag-over'));
+      dragSrcEl = null;
+    });
+
+    // Site definitions for add-tab dropdown
+    const sites = [
+      { name: 'ChatGPT', url: 'https://chatgpt.com', partition: 'persist:chatgpt',
+        icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 41 41' fill='none'%3E%3Cpath d='M37.532 16.87a9.963 9.963 0 0 0-.856-8.184 10.078 10.078 0 0 0-10.855-4.835A9.964 9.964 0 0 0 18.306.5a10.079 10.079 0 0 0-9.614 6.977 9.967 9.967 0 0 0-6.664 4.834 10.08 10.08 0 0 0 1.24 11.817 9.965 9.965 0 0 0 .856 8.185 10.079 10.079 0 0 0 10.855 4.835 9.965 9.965 0 0 0 7.516 3.35 10.078 10.078 0 0 0 9.617-6.981 9.967 9.967 0 0 0 6.663-4.834 10.079 10.079 0 0 0-1.243-11.813ZM22.498 37.886a7.474 7.474 0 0 1-4.799-1.735c.061-.033.168-.091.237-.134l7.964-4.6a1.294 1.294 0 0 0 .655-1.134V19.054l3.366 1.944a.12.12 0 0 1 .066.092v9.299a7.505 7.505 0 0 1-7.49 7.496ZM6.392 31.006a7.471 7.471 0 0 1-.894-5.023c.06.036.162.099.237.141l7.964 4.6a1.297 1.297 0 0 0 1.308 0l9.724-5.614v3.888a.12.12 0 0 1-.048.103l-8.051 4.649a7.504 7.504 0 0 1-10.24-2.744ZM4.297 13.62A7.469 7.469 0 0 1 8.2 10.333c0 .068-.004.19-.004.274v9.201a1.294 1.294 0 0 0 .654 1.132l9.723 5.614-3.366 1.944a.12.12 0 0 1-.114.012L7.044 23.86a7.504 7.504 0 0 1-2.747-10.24Zm27.658 6.437-9.724-5.615 3.367-1.943a.121.121 0 0 1 .113-.012l8.051 4.649a7.498 7.498 0 0 1-1.158 13.528v-9.476a1.293 1.293 0 0 0-.649-1.131Zm3.35-5.043c-.059-.037-.162-.099-.236-.141l-7.965-4.6a1.298 1.298 0 0 0-1.308 0l-9.723 5.614v-3.888a.12.12 0 0 1 .048-.103l8.05-4.645a7.497 7.497 0 0 1 11.135 7.763Zm-21.063 6.929-3.367-1.944a.12.12 0 0 1-.065-.092v-9.299a7.497 7.497 0 0 1 12.293-5.756 6.94 6.94 0 0 0-.236.134l-7.965 4.6a1.294 1.294 0 0 0-.654 1.132l-.006 11.225Zm1.829-3.943 4.33-2.501 4.332 2.5v5l-4.331 2.5-4.331-2.5V18Z' fill='white'/%3E%3C/svg%3E" },
+      { name: 'Gemini', url: 'https://gemini.google.com/?hl=zh', partition: 'persist:gemini',
+        icon: 'https://www.google.com/s2/favicons?domain=gemini.google.com&sz=32' },
+      { name: 'NotebookLM', url: 'https://notebooklm.google.com', partition: 'persist:notebooklm',
+        icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='2 2.5 12 9.5'%3E%3Cpath fill='white' d='M 8 3.5 C 5.23833 3.5 3 5.72 3 8.45917 V 10.8333 H 3.92167 V 10.5967 C 3.92167 9.48583 4.82917 8.585 5.94917 8.585 C 7.06917 8.585 7.97667 9.48583 7.97667 10.5967 V 10.8333 H 8.89833 V 10.5967 C 8.89833 8.98083 7.5775 7.67167 5.94917 7.67167 C 5.315 7.67167 4.7275 7.87 4.24667 8.20833 C 4.75 7.21583 5.78667 6.535 6.98333 6.535 C 8.67417 6.535 10.045 7.895 10.045 9.57167 V 10.8333 H 10.9667 V 9.57167 C 10.9667 7.39 9.18333 5.62083 6.98333 5.62083 C 5.99417 5.62083 5.08917 5.97833 4.3925 6.57083 C 5.07667 5.28833 6.435 4.41417 8 4.41417 C 10.2525 4.41417 12.0783 6.225 12.0783 8.45917 V 10.8333 H 13 V 8.45917 C 13 5.72 10.7617 3.5 8 3.5 Z'/%3E%3C/svg%3E" },
+      { name: 'Claude', url: 'https://claude.ai', partition: 'persist:claude',
+        icon: 'https://www.google.com/s2/favicons?domain=claude.ai&sz=32' },
+      { name: 'Codex', url: 'https://chatgpt.com/codex', partition: 'persist:codex',
+        icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='white' d='M13.333 11.418a.665.665 0 0 1 0 1.33h-2.5a.665.665 0 1 1 0-1.33zM6.741 7.347a.665.665 0 0 1 .912.228l1.25 2.083a.67.67 0 0 1 0 .685l-1.25 2.083a.666.666 0 0 1-1.14-.685L7.557 10 6.513 8.259a.665.665 0 0 1 .228-.912'/%3E%3Cpath fill='white' fill-rule='evenodd' d='M9.002 1.75c1.114 0 2.134.405 2.922 1.072q.392-.072.806-.073a4.523 4.523 0 0 1 4.447 5.326 4.524 4.524 0 0 1-1.922 7.18 4.52 4.52 0 0 1-4.256 2.995 4.5 4.5 0 0 1-2.923-1.073q-.391.072-.805.074a4.523 4.523 0 0 1-4.448-5.327 4.5 4.5 0 0 1-1.066-2.69l-.007-.233a4.53 4.53 0 0 1 2.994-4.258A4.525 4.525 0 0 1 9.002 1.75m0 1.328a3.2 3.2 0 0 0-3.087 2.367.67.67 0 0 1-.47.47 3.197 3.197 0 0 0-1.43 5.346.67.67 0 0 1 .17.64q-.106.398-.108.828A3.195 3.195 0 0 0 8.1 15.815l.087-.017a.66.66 0 0 1 .552.188 3.197 3.197 0 0 0 5.346-1.432l.028-.083a.66.66 0 0 1 .442-.386 3.2 3.2 0 0 0 2.368-3.086c0-.882-.358-1.681-.937-2.26a.66.66 0 0 1-.17-.64q.107-.397.108-.828A3.196 3.196 0 0 0 11.9 4.185a.66.66 0 0 1-.64-.171 3.19 3.19 0 0 0-2.093-.933z' clip-rule='evenodd'/%3E%3C/svg%3E" },
+    ];
+
+    // Build dropdown items
+    const addDropdown = document.getElementById('add-dropdown');
+    sites.forEach(site => {
+      const item = document.createElement('div');
+      item.className = 'dropdown-item';
+      item.innerHTML = `<img src="${site.icon}"><span>${site.name}</span>`;
+      item.addEventListener('click', () => { closeDropdown(); addTab(site); });
+      addDropdown.appendChild(item);
+    });
+
+    const dropdownOverlay = document.getElementById('dropdown-overlay');
+    function closeDropdown() {
+      addDropdown.classList.remove('show');
+      dropdownOverlay.classList.remove('show');
+    }
+
+    document.getElementById('add-tab-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const btn = document.getElementById('add-tab-btn');
+      const rect = btn.getBoundingClientRect();
+      addDropdown.style.left = rect.left + 'px';
+      if (addDropdown.classList.contains('show')) { closeDropdown(); }
+      else { addDropdown.classList.add('show'); dropdownOverlay.classList.add('show'); }
+    });
+
+    dropdownOverlay.addEventListener('click', closeDropdown);
+    document.addEventListener('click', (e) => {
+      if (!addDropdown.contains(e.target) && !document.getElementById('add-tab-btn').contains(e.target)) closeDropdown();
+    });
+
+    function addTab(site) {
+      const addBtn = document.getElementById('add-tab-btn');
+      const tab = document.createElement('div');
+      tab.className = 'tab';
+      tab.draggable = true;
+      tab.innerHTML = `<img class="tab-icon" src="${site.icon}"><span class="tab-label">${site.name}</span><button class="tab-close" title="Close">&times;</button>`;
+      tabBar.insertBefore(tab, addBtn);
+      const wv = document.createElement('webview');
+      wv.src = site.url;
+      wv.setAttribute('partition', site.partition);
+      webviewContainer.appendChild(wv);
+      wv.addEventListener('dom-ready', () => wv.insertCSS(injectedCSS));
+      const index = [...document.querySelectorAll('.tab')].indexOf(tab);
+      switchTo(index);
+    }
+
+    // Custom context menu
+    const ctxMenu = document.getElementById('context-menu');
+    const ctxOverlay = document.getElementById('ctx-overlay');
+    let ctxWcId = null;
+
+    function closeCtxMenu() { ctxMenu.classList.remove('show'); ctxOverlay.classList.remove('show'); }
+
+    ipcRenderer.on('show-context-menu', (_, { x, y, wcId }) => {
+      ctxWcId = wcId;
+      const tabBarHeight = document.getElementById('tab-bar').offsetHeight;
+      let posX = x, posY = y + tabBarHeight;
+      const mw = 180, mh = ctxMenu.offsetHeight || 200;
+      if (posX + mw > window.innerWidth) posX = window.innerWidth - mw - 4;
+      if (posY + mh > window.innerHeight) posY = window.innerHeight - mh - 4;
+      ctxMenu.style.left = posX + 'px';
+      ctxMenu.style.top = posY + 'px';
+      ctxMenu.classList.add('show');
+      ctxOverlay.classList.add('show');
+    });
+
+    ctxMenu.addEventListener('click', (e) => {
+      const item = e.target.closest('.ctx-item');
+      if (!item) return;
+      ipcRenderer.send('context-menu-action', { action: item.dataset.action, wcId: ctxWcId });
+      closeCtxMenu();
+    });
+
+    ctxOverlay.addEventListener('click', closeCtxMenu);
+    ctxOverlay.addEventListener('contextmenu', (e) => { e.preventDefault(); closeCtxMenu(); });
+
+    // Inject scrollbar style
+    const injectedCSS = `
+      ::-webkit-scrollbar { width: 5px !important; height: 5px !important; }
+      ::-webkit-scrollbar-track { background: transparent !important; }
+      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15) !important; border-radius: 3px !important; border: none !important; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25) !important; }
+      ::-webkit-scrollbar-corner { background: transparent !important; }
+      ::-webkit-scrollbar-button { display: none !important; }
+      html, body { overscroll-behavior: none !important; }
+    `;
+    document.querySelectorAll('webview:not(.usage-wv)').forEach(wv => {
+      wv.addEventListener('dom-ready', () => wv.insertCSS(injectedCSS));
+    });
+
+    // ========== Usage Battery System ==========
+    function setBattery(prefix, remaining, tooltip) {
+      const fill = document.getElementById(prefix + '-fill');
+      const tip = document.getElementById(prefix + '-tip');
+      if (!fill) return;
+      const r = Math.max(0, Math.min(100, remaining));
+      fill.style.width = r + '%';
+      if (r > 50) fill.style.background = '#4caf50';
+      else if (r > 20) fill.style.background = '#ff9800';
+      else fill.style.background = '#f44336';
+      if (tooltip) tip.textContent = tooltip;
+    }
+
+    // Retry scraping until data is found
+    function scrapeWithRetry(wv, scrapeFn, retries, delay) {
+      let attempt = 0;
+      function tryOnce() {
+        scrapeFn(wv).then(ok => {
+          if (!ok && attempt < retries) { attempt++; setTimeout(tryOnce, delay); }
+        }).catch(() => {
+          if (attempt < retries) { attempt++; setTimeout(tryOnce, delay); }
+        });
+      }
+      tryOnce();
+    }
+
+    // Scrape Claude
+    const claudeWv = document.getElementById('claude-usage-wv');
+    function scrapeClaudeUsage(wv) {
+      return wv.executeJavaScript(`
+        (function() {
+          var text = document.body ? document.body.innerText : '';
+          var r = {};
+          var m = text.match(/(\\d+)%\\s*used/g);
+          if (m && m.length >= 1) r.s = 100 - parseInt(m[0]);
+          if (m && m.length >= 2) r.w = 100 - parseInt(m[1]);
+          var rt = text.match(/Resets\\s+in\\s+(.+)/i);
+          if (rt) r.t = rt[1].split('\\n')[0].trim();
+          return r;
+        })()
+      `).then(d => {
+        if (d && d.s !== undefined) {
+          let tip = 'Session: ' + d.s + '% left';
+          if (d.w !== undefined) tip += ' | Week: ' + d.w + '%';
+          if (d.t) tip += ' | Reset: ' + d.t;
+          setBattery('claude', d.s, tip);
+          return true;
+        }
+        return false;
+      });
+    }
+
+    // Scrape Codex
+    const codexWv = document.getElementById('codex-usage-wv');
+    function scrapeCodexUsage(wv) {
+      return wv.executeJavaScript(`
+        (function() {
+          var text = document.body ? document.body.innerText : '';
+          var r = {};
+          var m = text.match(/(\\d+)%/g);
+          if (m && m.length >= 1) r.h = parseInt(m[0]);
+          if (m && m.length >= 2) r.w = parseInt(m[1]);
+          var b = text.match(/剩余额度[\\s\\S]*?(\\d+[\\d.]*)/);
+          if (b) r.b = b[1];
+          return r;
+        })()
+      `).then(d => {
+        if (d && d.h !== undefined) {
+          let tip = '5h: ' + d.h + '%';
+          if (d.w !== undefined) tip += ' | Week: ' + d.w + '%';
+          if (d.b !== undefined) tip += ' | Balance: $' + d.b;
+          setBattery('codex', d.h, tip);
+          return true;
+        }
+        return false;
+      });
+    }
+
+    // Start scraping after webviews load
+    claudeWv.addEventListener('dom-ready', () => {
+      scrapeWithRetry(claudeWv, scrapeClaudeUsage, 10, 3000);
+    });
+    codexWv.addEventListener('dom-ready', () => {
+      scrapeWithRetry(codexWv, scrapeCodexUsage, 10, 3000);
+    });
+
+    // Refresh button
+    const refreshBtn = document.getElementById('refresh-usage-btn');
+    function refreshUsage() {
+      refreshBtn.classList.add('spinning');
+      claudeWv.reload();
+      codexWv.reload();
+      // Wait for reload then scrape
+      let done = 0;
+      function checkDone() { if (++done >= 2) setTimeout(() => refreshBtn.classList.remove('spinning'), 500); }
+      claudeWv.addEventListener('dom-ready', function onReload() {
+        claudeWv.removeEventListener('dom-ready', onReload);
+        scrapeWithRetry(claudeWv, scrapeClaudeUsage, 10, 3000);
+        checkDone();
+      });
+      codexWv.addEventListener('dom-ready', function onReload() {
+        codexWv.removeEventListener('dom-ready', onReload);
+        scrapeWithRetry(codexWv, scrapeCodexUsage, 10, 3000);
+        checkDone();
+      });
+    }
+    refreshBtn.addEventListener('click', refreshUsage);
+
+    // Memory display - update every 5s
+    async function updateMemory() {
+      try {
+        const kb = await ipcRenderer.invoke('get-memory');
+        const mb = Math.round(kb / 1024);
+        const el = document.getElementById('mem-display');
+        if (mb >= 1024) {
+          el.textContent = (mb / 1024).toFixed(1) + ' GB';
+        } else {
+          el.textContent = mb + ' MB';
+        }
+        el.style.color = mb > 2048 ? '#f44336' : mb > 1024 ? '#ff9800' : '#666';
+      } catch(e) {}
+    }
+    updateMemory();
+    setInterval(updateMemory, 5000);
+  </script>
+</body>
+</html>
