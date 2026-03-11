@@ -43,22 +43,6 @@ function createWindow() {
     }
   });
 
-  // Context menu action handler
-  ipcMain.on('context-menu-action', (_, { action, wcId }) => {
-    const { webContents } = require('electron');
-    const wc = webContents.fromId(wcId);
-    if (!wc) return;
-    if (action === 'copy') wc.copy();
-    else if (action === 'paste') wc.paste();
-    else if (action === 'cut') wc.cut();
-    else if (action === 'selectAll') wc.selectAll();
-    else if (action === 'reload') wc.reload();
-    else if (action === 'copyUrl') {
-      const { clipboard } = require('electron');
-      clipboard.writeText(wc.getURL());
-    }
-  });
-
   // Also intercept from webview contents
   win.webContents.on('did-attach-webview', (_, webviewContents) => {
     webviewContents.on('before-input-event', (event, input) => {

@@ -148,6 +148,17 @@ rm -rf "C:\xxx\AIHub\resources\app"
 - **原因**：将 `ipcMain.handle('get-memory')` 从 `createWindow()` 函数内移到函数外部时，遗留了一个多余的 `}`
 - **修复**：删除第 81 行孤立的 `}`
 
+### 右键菜单 Copy/Paste/Cut 无效（经历两轮修复）
+- **现象**：右键菜单正常弹出，但点击 Copy、Paste、Cut 无反应
+- **第一次修复**：去掉 IPC 中转，在 renderer 直接调用 webview 的 `.copy()` / `.paste()` 方法。仍然无效
+- **根因**：点击菜单项时 `mousedown` 事件导致 webview 失焦、文本选区丢失，webview 的 `.copy()` 等方法找不到选区
+- **最终修复**：
+  1. 在 `ctxMenu` 和 `ctxOverlay` 上添加 `mousedown preventDefault`，阻止点击菜单时 webview 失焦
+  2. Copy：通过 `executeJavaScript('window.getSelection().toString()')` 获取选中文本，写入 clipboard
+  3. Cut：在 webview 中执行 `document.execCommand('delete')` 删除选区，同时写入 clipboard
+  4. Paste：`wv.focus()` + `wv.insertText(clipboard.readText())` 直接插入文本
+  5. 从 main.js 移除了不再需要的 `context-menu-action` IPC handler
+
 ### 内存显示虚高（经历两轮修复）
 - **第一次**：界面显示 1.4GB，任务管理器仅 500MB
   - 原因：`app.getAppMetrics()` 的 `workingSetSize` 包含共享内存（Chromium DLLs），多进程重复计算约 3 倍虚高

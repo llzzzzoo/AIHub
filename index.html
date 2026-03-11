@@ -220,8 +220,6 @@
     <div class="ctx-item" data-action="paste"><span>Paste</span><span class="shortcut">Ctrl+V</span></div>
     <div class="ctx-item" data-action="cut"><span>Cut</span><span class="shortcut">Ctrl+X</span></div>
     <div class="ctx-sep"></div>
-    <div class="ctx-item" data-action="selectAll"><span>Select All</span><span class="shortcut">Ctrl+A</span></div>
-    <div class="ctx-sep"></div>
     <div class="ctx-item" data-action="reload"><span>Reload</span><span class="shortcut">Ctrl+R</span></div>
     <div class="ctx-item" data-action="copyUrl"><span>Copy URL</span><span class="shortcut"></span></div>
   </div>
@@ -415,11 +413,42 @@
       ctxOverlay.classList.add('show');
     });
 
+    // Prevent webview selection loss when clicking menu
+    ctxMenu.addEventListener('mousedown', (e) => e.preventDefault());
+    ctxOverlay.addEventListener('mousedown', (e) => e.preventDefault());
+
     ctxMenu.addEventListener('click', (e) => {
       const item = e.target.closest('.ctx-item');
       if (!item) return;
-      ipcRenderer.send('context-menu-action', { action: item.dataset.action, wcId: ctxWcId });
+      const action = item.dataset.action;
+      const wv = document.querySelector('webview.active');
       closeCtxMenu();
+      if (!wv) return;
+      const { clipboard } = require('electron');
+      if (action === 'copy') {
+        wv.executeJavaScript('window.getSelection().toString()').then(text => {
+          if (text) clipboard.writeText(text);
+        });
+      } else if (action === 'cut') {
+        wv.executeJavaScript(`
+          (function() {
+            var sel = window.getSelection();
+            var text = sel.toString();
+            if (text) document.execCommand('delete');
+            return text;
+          })()
+        `).then(text => {
+          if (text) clipboard.writeText(text);
+        });
+      } else if (action === 'paste') {
+        wv.focus();
+        const text = clipboard.readText();
+        if (text) wv.insertText(text);
+      } else if (action === 'reload') {
+        wv.reload();
+      } else if (action === 'copyUrl') {
+        clipboard.writeText(wv.getURL());
+      }
     });
 
     ctxOverlay.addEventListener('click', closeCtxMenu);
