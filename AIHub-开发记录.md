@@ -84,6 +84,20 @@ rm -rf "C:\xxx\AIHub\resources\app"
 - 颜色编码：正常白色，>1GB 橙色，>2GB 红色
 - 显示格式：小于 1GB 显示 MB，大于等于 1GB 显示 GB（保留一位小数）
 
+### 8. 复制图片
+- 右键点击图片时，菜单自动显示 "Copy Image" 选项（非图片区域不显示）
+- 通过 `context-menu` 事件的 `params.mediaType` 和 `params.hasImageContents` 判断是否为图片
+- 使用 Electron 的 `webContents.copyImageAt(x, y)` 将图片写入系统剪贴板
+- 通过 IPC 通信：renderer 发送坐标和 webContentsId → main 调用 `copyImageAt()`
+- 复制后可直接 Ctrl+V 粘贴到微信、Word 等任意应用
+
+### 9. 文件下载
+- 所有 webview 中触发的下载自动保存到 `C:\Users\Lzo\Downloads\`
+- 通过 `app.on('session-created')` 为所有 session（包括各 `persist:xxx` partition）注册 `will-download` 事件
+- 使用 `item.setSavePath()` 设置保存路径，跳过系统"另存为"对话框
+- 同名文件自动追加 `(1)`、`(2)` ... 避免覆盖
+- 下载路径通过 `app.getPath('home') + '/Downloads'` 获取，跟随系统用户目录
+
 ### 7. 性能优化
 - **懒加载**：只有 ChatGPT 启动时加载 URL，其他 webview 使用 `data-src` 属性存储 URL，首次切换到该标签时才设置 `src` 加载
 - **减少默认标签**：从 5 个默认标签减至 3 个（移除 Claude、Codex），降低启动内存
@@ -167,6 +181,15 @@ rm -rf "C:\xxx\AIHub\resources\app"
   - 原因：`PrivateMemorySize` 包含已换页到磁盘的私有内存，仍然偏高
   - 修复：改用 WMI `WorkingSetPrivate`（私有工作集），与任务管理器完全一致
   - 验证：WMI 返回 654904 KB ≈ 640MB，与任务管理器 650MB 吻合
+
+---
+
+### 第八阶段：复制图片 & 文件下载
+1. 右键菜单增加 "Copy Image"：右键图片时自动出现，通过 `copyImageAt()` 复制到剪贴板
+2. main.js 传递 `mediaType` / `hasImageContents`，renderer 按条件显隐菜单项
+3. 添加 `will-download` 事件监听，所有 webview 下载自动保存到 `Downloads` 文件夹
+4. 使用 `app.on('session-created')` 覆盖所有 partition session
+5. 同名文件自动编号避免覆盖
 
 ---
 

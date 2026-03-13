@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, session } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 // GPU & rendering optimizations
 app.commandLine.appendSwitch('enable-gpu-rasterization');
@@ -52,11 +53,19 @@ function createWindow() {
       }
     });
 
+    // Open new-window requests (Ctrl+click, target="_blank") in default browser
+    webviewContents.setWindowOpenHandler(({ url }) => {
+      if (url && url.startsWith('http')) shell.openExternal(url);
+      return { action: 'deny' };
+    });
+
     webviewContents.on('context-menu', (_, params) => {
       win.webContents.send('show-context-menu', {
         x: params.x,
         y: params.y,
         wcId: webviewContents.id,
+        mediaType: params.mediaType,
+        hasImageContents: params.hasImageContents,
       });
     });
   });
@@ -81,6 +90,39 @@ ipcMain.handle('get-memory', () => {
       }
     });
   });
+});
+
+// Copy image at coordinates inside a webview
+ipcMain.handle('copy-image-at', (event, { wcId, x, y }) => {
+  const { webContents } = require('electron');
+  const wc = webContents.fromId(wcId);
+  if (wc) wc.copyImageAt(x, y);
+});
+
+// Download handler — save files to Downloads folder by default
+const DOWNLOAD_DIR = path.join(app.getPath('home'), 'Downloads');
+
+function setupDownloadHandler(sess) {
+  sess.on('will-download', (event, item) => {
+    const fileName = item.getFilename();
+    let savePath = path.join(DOWNLOAD_DIR, fileName);
+    // Avoid overwriting: append (1), (2), ... if file exists
+    if (fs.existsSync(savePath)) {
+      const ext = path.extname(fileName);
+      const base = path.basename(fileName, ext);
+      let i = 1;
+      while (fs.existsSync(savePath)) {
+        savePath = path.join(DOWNLOAD_DIR, `${base} (${i})${ext}`);
+        i++;
+      }
+    }
+    item.setSavePath(savePath);
+  });
+}
+
+// Attach download handler to every session (default + all persist: partitions)
+app.on('session-created', (sess) => {
+  setupDownloadHandler(sess);
 });
 
 app.whenReady().then(createWindow);

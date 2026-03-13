@@ -217,6 +217,7 @@
   <div id="ctx-overlay"></div>
   <div id="context-menu">
     <div class="ctx-item" data-action="copy"><span>Copy</span><span class="shortcut">Ctrl+C</span></div>
+    <div class="ctx-item" data-action="copyImage" id="ctx-copy-image" style="display:none"><span>Copy Image</span><span class="shortcut"></span></div>
     <div class="ctx-item" data-action="paste"><span>Paste</span><span class="shortcut">Ctrl+V</span></div>
     <div class="ctx-item" data-action="cut"><span>Cut</span><span class="shortcut">Ctrl+X</span></div>
     <div class="ctx-sep"></div>
@@ -397,11 +398,17 @@
     const ctxMenu = document.getElementById('context-menu');
     const ctxOverlay = document.getElementById('ctx-overlay');
     let ctxWcId = null;
+    let ctxImgX = 0, ctxImgY = 0;
 
     function closeCtxMenu() { ctxMenu.classList.remove('show'); ctxOverlay.classList.remove('show'); }
 
-    ipcRenderer.on('show-context-menu', (_, { x, y, wcId }) => {
+    ipcRenderer.on('show-context-menu', (_, { x, y, wcId, mediaType, hasImageContents }) => {
       ctxWcId = wcId;
+      ctxImgX = x;
+      ctxImgY = y;
+      // Show/hide "Copy Image" based on whether right-clicked on an image
+      const copyImageItem = document.getElementById('ctx-copy-image');
+      copyImageItem.style.display = (mediaType === 'image' && hasImageContents) ? 'flex' : 'none';
       const tabBarHeight = document.getElementById('tab-bar').offsetHeight;
       let posX = x, posY = y + tabBarHeight;
       const mw = 180, mh = ctxMenu.offsetHeight || 200;
@@ -425,7 +432,9 @@
       closeCtxMenu();
       if (!wv) return;
       const { clipboard } = require('electron');
-      if (action === 'copy') {
+      if (action === 'copyImage') {
+        ipcRenderer.invoke('copy-image-at', { wcId: ctxWcId, x: ctxImgX, y: ctxImgY });
+      } else if (action === 'copy') {
         wv.executeJavaScript('window.getSelection().toString()').then(text => {
           if (text) clipboard.writeText(text);
         });
